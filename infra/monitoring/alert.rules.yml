@@ -1,0 +1,47 @@
+groups:
+  - name: aura-alerts
+    rules:
+      - alert: BackendDown
+        expr: up{job="aura-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend is down"
+          description: "Aura backend service is unreachable."
+
+      - alert: HighErrorRate
+        expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP error rate"
+          description: "Over 5% of requests are failing."
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket[5m])) by (le)) > 2.0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High P99 Latency"
+          description: "P99 latency is > 2 seconds for 10 minutes."
+
+      - alert: HighMemoryUsage
+        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High JVM Memory Usage"
+          description: "JVM Heap usage is over 85%."
+
+      - alert: KafkaConsumerLag
+        expr: sum(kafka_consumergroup_lag) by (consumergroup) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Kafka Consumer Lag"
+          description: "Consumer group lag is over 1000."

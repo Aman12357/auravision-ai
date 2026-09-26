@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aura-frontend
+  namespace: aura-production
+  labels:
+    app: aura-frontend
+    tier: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aura-frontend
+  template:
+    metadata:
+      labels:
+        app: aura-frontend
+        tier: frontend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: aura-frontend
+          image: ghcr.io/aura-video-ai/frontend:${IMAGE_TAG}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          envFrom:
+            - configMapRef:
+                name: aura-frontend-config
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 15
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aura-frontend-config
+  namespace: aura-production
+data:
+  NEXT_PUBLIC_API_URL: "https://api.aura.ai/api/v1"

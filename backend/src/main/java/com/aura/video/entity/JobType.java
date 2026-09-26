@@ -1,0 +1,5 @@
+package com.aura.video.entity;
+
+public enum JobType {
+    TEXT_TO_VIDEO, IMAGE_TO_VIDEO, VIDEO_TO_VIDEO, UPSCALE, VOICE_OVER, SUBTITLE_GENERATION, MUSIC_GENERATION
+}

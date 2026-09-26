@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: aura-production
+  labels:
+    app: kafka
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: client
+      port: 9092
+      targetPort: 9092
+      protocol: TCP
+    - name: interbroker
+      port: 9093
+      targetPort: 9093
+      protocol: TCP
+  selector:
+    app: kafka
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: aura-production
+  labels:
+    app: kafka
+spec:
+  type: ClusterIP
+  ports:
+    - name: client
+      port: 9092
+      targetPort: 9092
+      protocol: TCP
+  selector:
+    app: kafka

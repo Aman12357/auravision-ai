@@ -1,0 +1,193 @@
+version: '3.9'
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: aura-postgres
+    environment:
+      POSTGRES_DB: aura_db
+      POSTGRES_USER: aura
+      POSTGRES_PASSWORD: aura_secret
+    ports: ['5432:5432']
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U aura -d aura_db']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [aura-network]
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: aura-redis
+    command: redis-server --requirepass redis_secret
+    ports: ['6379:6379']
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_secret", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [aura-network]
+
+  # Zookeeper (for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: aura-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks: [aura-network]
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: aura-kafka
+    depends_on: [zookeeper]
+    ports: ['9092:9092']
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: nc -z localhost 9092 || exit -1
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks: [aura-network]
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: aura-elasticsearch
+    environment:
+      discovery.type: single-node
+      ES_JAVA_OPTS: '-Xms512m -Xmx512m'
+      xpack.security.enabled: 'false'
+    ports: ['9200:9200']
+    volumes: [es_data:/usr/share/elasticsearch/data]
+    healthcheck:
+      test: curl -s http://localhost:9200 >/dev/null || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 50
+    networks: [aura-network]
+
+  # Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    container_name: aura-kibana
+    depends_on: [elasticsearch]
+    ports: ['5601:5601']
+    environment:
+      ELASTICSEARCH_HOSTS: 'http://elasticsearch:9200'
+    networks: [aura-network]
+
+  # Logstash
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.0
+    container_name: aura-logstash
+    volumes:
+      - ./infra/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    depends_on: [elasticsearch]
+    ports:
+      - "5044:5044"
+    networks: [aura-network]
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: aura-prometheus
+    volumes:
+      - ./infra/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infra/monitoring/alert.rules.yml:/etc/prometheus/alert.rules.yml
+    ports: ['9090:9090']
+    networks: [aura-network]
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: aura-grafana
+    ports: ['3001:3000']
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+      GF_SECURITY_ADMIN_USER: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on: [prometheus]
+    networks: [aura-network]
+
+  # Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aura-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:postgresql://postgres:5432/aura_db
+      DB_USERNAME: aura
+      DB_PASSWORD: aura_secret
+      REDIS_HOST: redis
+      REDIS_PASSWORD: redis_secret
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      ELASTICSEARCH_HOST: elasticsearch
+      ELASTICSEARCH_PORT: 9200
+    ports: ['8080:8080']
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_started }
+    networks: [aura-network]
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aura-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8080
+    ports: ['3000:3000']
+    depends_on: [backend]
+    networks: [aura-network]
+
+  # NGINX
+  nginx:
+    image: nginx:alpine
+    container_name: aura-nginx
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports: ['80:80', '443:443']
+    depends_on: [frontend, backend]
+    networks: [aura-network]
+
+volumes:
+  postgres_data:
+  redis_data:
+  es_data:
+  grafana_data:
+
+networks:
+  aura-network:
+    driver: bridge

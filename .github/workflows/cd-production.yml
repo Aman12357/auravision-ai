@@ -1,0 +1,53 @@
+name: CD Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      
+    - name: Set Kubeconfig
+      run: |
+        mkdir -p $HOME/.kube
+        echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+        chmod 600 $HOME/.kube/config
+        
+    - name: Run Database Migrations
+      run: |
+        kubectl create job --from=cronjob/db-migrator db-migration-${{ github.sha }}
+        kubectl wait --for=condition=complete job/db-migration-${{ github.sha }} --timeout=300s
+        
+    - name: Deploy Backend
+      run: |
+        kubectl set image deployment/aura-backend backend=ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+        
+    - name: Deploy Frontend
+      run: |
+        kubectl set image deployment/aura-frontend frontend=ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+        
+    - name: Wait for rollout to complete
+      run: |
+        kubectl rollout status deployment/aura-backend --timeout=300s
+        kubectl rollout status deployment/aura-frontend --timeout=300s
+        
+    - name: Health Check
+      run: |
+        # Optional: port-forward and curl health endpoint or use external URL
+        echo "Validating health endpoints..."
+        
+    - name: Notify Slack
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

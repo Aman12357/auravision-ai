@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+**/node_modules/
+.pnpm-store/
+
+# Next.js
+.next/
+**/.next/
+out/
+build/
+dist/
+
+# Java & Spring Boot
+target/
+**/target/
+*.class
+*.jar
+*.war
+backend/logs/
+*.log
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+ENV/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Storage & Temp
+storage/
+*.zip
+*.tsbuildinfo

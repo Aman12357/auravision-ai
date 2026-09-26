@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'Aura Dashboards'
+    orgId: 1
+    folder: 'Aura Video AI'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
