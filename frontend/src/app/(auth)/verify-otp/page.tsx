@@ -1,12 +1,13 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { OtpInput } from '@/components/auth/OtpInput';
 import { api } from '@/lib/api';
 
-export default function VerifyOtpPage() {
+function VerifyOtpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
@@ -58,39 +59,41 @@ export default function VerifyOtpPage() {
       isLoading={isSubmitting}
     >
       <form onSubmit={handleVerify} className="space-y-8 flex flex-col items-center">
-        <OtpInput value={otp} onChange={(val) => {
-          setOtp(val);
-          if (val.length === 6) {
-            // Auto submit
-            setTimeout(() => {
-              const syntheticEvent = { preventDefault: () => {} } as React.FormEvent;
-              handleVerify(syntheticEvent);
-            }, 100);
-          }
-        }} />
+        <OtpInput value={otp} onChange={setOtp} length={6} />
         
-        <div className="w-full">
+        <div className="w-full space-y-4">
           <button
             type="submit"
-            disabled={isSubmitting || otp.length !== 6}
-            className="w-full py-2.5 px-4 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-500 hover:to-secondary-500 text-white rounded-xl font-medium transition-all shadow-glow-primary active:scale-[0.98] disabled:opacity-50"
+            disabled={otp.length !== 6 || isSubmitting}
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-medium shadow-lg shadow-primary-500/20 disabled:opacity-50 transition-all cursor-pointer disabled:cursor-not-allowed"
           >
-            Verify
+            Verify Code
           </button>
-        </div>
-
-        <div className="text-center text-sm text-surface-400">
-          Didn't receive the code?{' '}
-          <button
-            type="button"
-            onClick={handleResend}
-            disabled={countdown > 0}
-            className="text-primary-400 hover:text-primary-300 disabled:opacity-50 disabled:hover:text-primary-400 font-medium"
-          >
-            {countdown > 0 ? `Resend in ${countdown}s` : 'Resend now'}
-          </button>
+          
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={countdown > 0}
+              className="text-sm text-surface-400 hover:text-white transition-colors disabled:opacity-50"
+            >
+              {countdown > 0 ? `Resend code in ${countdown}s` : 'Resend code'}
+            </button>
+          </div>
         </div>
       </form>
     </AuthCard>
+  );
+}
+
+export default function VerifyOtpPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#030712] flex items-center justify-center p-4">
+        <div className="w-8 h-8 border-2 border-[#4893FC] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <VerifyOtpContent />
+    </Suspense>
   );
 }

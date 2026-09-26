@@ -1,13 +1,14 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Lock, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { OtpInput } from '@/components/auth/OtpInput';
 import { api } from '@/lib/api';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
@@ -60,44 +61,52 @@ export default function ResetPasswordPage() {
           <OtpInput value={otp} onChange={setOtp} length={6} />
         </div>
 
-        <div className="space-y-4">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-surface-500" />
-            </div>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              className="w-full bg-surface-900/50 border border-surface-700/50 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="New Password"
-            />
-          </div>
+        <div>
+          <label className="block text-sm text-surface-400 mb-2">New Password</label>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="w-full px-4 py-2.5 bg-surface-900/50 border border-surface-700 rounded-xl focus:outline-none focus:border-primary-500 text-white placeholder-surface-500"
+            placeholder="••••••••"
+            required
+            minLength={8}
+          />
+        </div>
 
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Check className="h-5 w-5 text-surface-500" />
-            </div>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className="w-full bg-surface-900/50 border border-surface-700/50 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Confirm New Password"
-            />
-          </div>
+        <div>
+          <label className="block text-sm text-surface-400 mb-2">Confirm Password</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className="w-full px-4 py-2.5 bg-surface-900/50 border border-surface-700 rounded-xl focus:outline-none focus:border-primary-500 text-white placeholder-surface-500"
+            placeholder="••••••••"
+            required
+            minLength={8}
+          />
         </div>
 
         <button
           type="submit"
-          disabled={isSubmitting || otp.length !== 6 || !newPassword}
-          className="w-full py-2.5 px-4 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-500 hover:to-secondary-500 text-white rounded-xl font-medium transition-all shadow-glow-primary active:scale-[0.98] disabled:opacity-50"
+          disabled={isSubmitting}
+          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 text-white font-medium shadow-lg shadow-primary-500/20 disabled:opacity-50 transition-all cursor-pointer disabled:cursor-not-allowed"
         >
           Reset Password
         </button>
       </form>
     </AuthCard>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#030712] flex items-center justify-center p-4">
+        <div className="w-8 h-8 border-2 border-[#4893FC] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }

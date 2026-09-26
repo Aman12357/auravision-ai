@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Loader2, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -53,32 +53,44 @@ export default function OAuthCallbackPage() {
   }, [searchParams, router]);
 
   return (
+    <div className="max-w-md w-full bg-[#0F172A] border border-slate-800 rounded-2xl p-8 text-center shadow-xl">
+      {error ? (
+        <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
+          <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-6">
+            <ShieldAlert size={32} />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400 mb-6">{error}</p>
+          <button 
+            onClick={() => router.push('/login')}
+            className="w-full py-3 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-xl font-medium transition-colors"
+          >
+            Return to Sign In
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center">
+          <div className="w-16 h-16 bg-[#4893FC]/20 text-[#4893FC] rounded-full flex items-center justify-center mb-6">
+            <Loader2 size={32} className="animate-spin" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Google Authentication</h2>
+          <p className="text-slate-400">Verifying session & creating secure user connection...</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
     <div className="min-h-screen bg-[#030712] flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-[#0F172A] border border-slate-800 rounded-2xl p-8 text-center shadow-xl">
-        {error ? (
-          <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
-            <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mb-6">
-              <ShieldAlert size={32} />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-slate-400 mb-6">{error}</p>
-            <button 
-              onClick={() => router.push('/login')}
-              className="w-full py-3 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-xl font-medium transition-colors"
-            >
-              Return to Sign In
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center">
-            <div className="w-16 h-16 bg-[#4893FC]/20 text-[#4893FC] rounded-full flex items-center justify-center mb-6">
-              <Loader2 size={32} className="animate-spin" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Google Authentication</h2>
-            <p className="text-slate-400">Verifying session & creating secure user connection...</p>
-          </div>
-        )}
-      </div>
+      <Suspense fallback={
+        <div className="flex flex-col items-center">
+          <Loader2 size={32} className="animate-spin text-[#4893FC]" />
+        </div>
+      }>
+        <OAuthCallbackContent />
+      </Suspense>
     </div>
   );
 }
