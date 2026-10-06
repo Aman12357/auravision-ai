@@ -122,21 +122,11 @@ const SHOWCASE_VIDEOS = [
   }
 ];
 
-function getGuaranteedAiImageUrl(prompt: string, seed: number = 0): string {
-  const p = (prompt || '').toLowerCase();
-  if (p.includes('cyberpunk') || p.includes('neon') || p.includes('futuristic') || p.includes('city') || p.includes('metropolis')) {
-    return '/assets/hero_video_bg.png';
-  }
-  if (p.includes('samurai') || p.includes('warrior') || p.includes('character') || p.includes('robot')) {
-    return '/assets/feature_text_to_video.png';
-  }
-  if (p.includes('space') || p.includes('star') || p.includes('nebula') || p.includes('galaxy') || p.includes('portal') || p.includes('cosmic')) {
-    return '/assets/video_showcase.png';
-  }
-  if (p.includes('forest') || p.includes('tree') || p.includes('nature') || p.includes('tiger') || p.includes('animal') || p.includes('castle') || p.includes('aurora')) {
-    return '/assets/feature_video_edit.png';
-  }
-  return '/assets/hero_video_bg.png';
+function getGuaranteedAiImageUrl(prompt: string, seed: number = 0, width: number = 1280, height: number = 720): string {
+  const s = seed || Math.floor(Math.random() * 10000000) + 1;
+  const cleanPrompt = (prompt || 'cinematic photorealistic masterpiece').trim();
+  const encoded = encodeURIComponent(`photorealistic 8k, ${cleanPrompt}, highly detailed, cinematic lighting, masterpiece, ultra sharp focus`);
+  return `https://image.pollinations.ai/prompt/${encoded}?width=${width}&height=${height}&nologo=true&seed=${s}&model=flux`;
 }
 
 export default function AuraLandingPage() {
@@ -263,31 +253,68 @@ export default function AuraLandingPage() {
 
     // Text to Image Generation Mode
     if (generationMode === 'text-to-image') {
-      const seed = Math.floor(Math.random() * 1000000);
-      const encodedPrompt = encodeURIComponent(`photorealistic 8k, ${prompt}, highly detailed, masterpiece, cinematic lighting, ultra sharp focus`);
-      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&nologo=true&seed=${seed}`;
-      const fallbackUrl = getGuaranteedAiImageUrl(prompt, seed);
+      let width = 1280;
+      let height = 720;
+      if (aspectRatio === '9:16') {
+        width = 720;
+        height = 1280;
+      } else if (aspectRatio === '1:1') {
+        width = 1024;
+        height = 1024;
+      } else if (aspectRatio === '4:3') {
+        width = 1024;
+        height = 768;
+      }
 
+      const seed = Math.floor(Math.random() * 9999999) + 1;
+      const fullPrompt = `${prompt.trim()}, ${imageStyle || 'photorealistic 8k'}, ${lightingMood || 'cinematic lighting'}, highly detailed, masterpiece, ultra sharp focus`;
+      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${width}&height=${height}&nologo=true&seed=${seed}&model=flux`;
+
+      let completed = false;
       const preloadImg = new Image();
-      preloadImg.src = pollinationsUrl;
 
+      const finishSuccess = (imageUrl: string) => {
+        if (completed) return;
+        completed = true;
+        clearInterval(interval);
+        setGenerationProgress(100);
+        setTimeout(() => {
+          setIsGenerating(false);
+          setGeneratedImage({
+            url: imageUrl,
+            prompt: prompt,
+            aspectRatio: aspectRatio
+          });
+          toast.success("✨ Photorealistic AI image generated successfully!");
+        }, 300);
+      };
+
+      // Smooth progress animation that stays at ~92% while waiting for AI generation
       const interval = setInterval(() => {
         setGenerationProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setIsGenerating(false);
-            const isLoaded = (preloadImg.complete && preloadImg.naturalWidth > 0);
-            setGeneratedImage({
-              url: isLoaded ? pollinationsUrl : fallbackUrl,
-              prompt: prompt,
-              aspectRatio: aspectRatio
-            });
-            toast.success("✨ Photorealistic AI image generated successfully!");
-            return 100;
-          }
-          return prev + 5;
+          if (prev < 88) return prev + 3;
+          if (prev < 95) return prev + 0.5;
+          return prev;
         });
-      }, 80);
+      }, 100);
+
+      preloadImg.onload = () => {
+        finishSuccess(pollinationsUrl);
+      };
+
+      preloadImg.onerror = () => {
+        // Fallback to high-speed turbo model with same prompt and seed if flux is busy
+        const turboUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=${width}&height=${height}&nologo=true&seed=${seed}`;
+        finishSuccess(turboUrl);
+      };
+
+      preloadImg.src = pollinationsUrl;
+
+      // 8-second safety timeout so it transitions and renders in the preview even on slow networks
+      setTimeout(() => {
+        finishSuccess(pollinationsUrl);
+      }, 8000);
+
       return;
     }
 
@@ -851,12 +878,16 @@ export default function AuraLandingPage() {
                         <span className="text-slate-500 font-mono">4K Ultra HD</span>
                       </div>
 
-                      <div className="relative rounded-xl overflow-hidden border border-white/10 group aspect-video max-h-[450px]">
+                      <div className="relative rounded-xl overflow-hidden border border-white/10 group aspect-video max-h-[450px] bg-slate-950 flex items-center justify-center">
                         <img 
                           src={generatedImage.url} 
                           alt={generatedImage.prompt} 
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = getGuaranteedAiImageUrl(generatedImage.prompt, 0);
+                            const target = e.target as HTMLImageElement;
+                            const fallback = `https://image.pollinations.ai/prompt/${encodeURIComponent(generatedImage.prompt)}?width=1280&height=720&nologo=true`;
+                            if (target.src !== fallback) {
+                              target.src = fallback;
+                            }
                           }}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                         />
